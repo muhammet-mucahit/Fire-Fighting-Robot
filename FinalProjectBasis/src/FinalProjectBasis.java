@@ -1,6 +1,7 @@
 import com.ridgesoft.intellibrain.IntelliBrain;
 import com.ridgesoft.intellibrain.IntelliBrainDigitalIO;
 import com.ridgesoft.io.Display;
+import com.ridgesoft.robotics.AnalogInput;
 import com.ridgesoft.robotics.ContinuousRotationServo;
 import com.ridgesoft.robotics.Motor;
 import com.ridgesoft.robotics.RangeFinder;
@@ -18,6 +19,11 @@ public class FinalProjectBasis {
     private static final int LEFT_BUMPER = 100;
     private static final int RIGHT_BUMPER = 101;
 
+    // Possible floor Tags
+    private static final int LINE_TAG = 0;
+    private static final int CIRCLE_TAG = 1;
+    private static final int NO_TAG = 2;
+
     // Algorithm Parameters
     private static final int DIST_TO_SIDE_WALL = 15;
     private static final int DIST_TO_FRONT_WALL = 15;
@@ -26,6 +32,7 @@ public class FinalProjectBasis {
     private static final float TURN_FACTOR = 7.5f; //8 ONCEKI DEGERLERE BAK BIZ NE YAPMISIZ!
     private static final int GO_VELO = 8;
     private static final int TURN_VELO = 5;
+    private static final int LINE_LIMIT = 80;
 
     //****** HARDWARE OBJECTS AND VARIABLES ******
     private static int state;
@@ -48,6 +55,9 @@ public class FinalProjectBasis {
 
     private static Display lcd;
 
+    private static AnalogInput lineSensor;
+    private static int totalLines;
+
     public static void main(String[] args) {
         //****** Construction of the hardware objects ******
         startButton = IntelliBrain.getDigitalIO(12);
@@ -61,6 +71,9 @@ public class FinalProjectBasis {
         rBumber.setPullUp(true);
 
         lcd = IntelliBrain.getLcdDisplay();
+
+        lineSensor = IntelliBrain.getAnalogInput(7);
+        totalLines = 0;
 
         lSonar = new ParallaxPing(IntelliBrain.getDigitalIO(3));
         fSonar = new ParallaxPing(IntelliBrain.getDigitalIO(4));
@@ -117,6 +130,12 @@ public class FinalProjectBasis {
 
         move(GO_VELO, delta);
 
+        if (getFloorTag() == LINE_TAG) {
+            totalLines++;
+            lcd.print(1, "Lines: " + totalLines);
+        }
+
+
         // Conditions
         // if(flame is detected)
         // return CENTER
@@ -163,6 +182,21 @@ public class FinalProjectBasis {
         s.ping();
         wait(25);
         return s.getDistanceCm();
+    }
+
+    // White-line sensor
+    private static int getFloorTag() {
+        if (lineSensor.sample() < LINE_LIMIT) {
+            move(GO_VELO, 0);
+            wait(500);
+            stop();
+            if (lineSensor.sample() < LINE_LIMIT)
+                return LINE_TAG;
+            else
+                return CIRCLE_TAG;
+        }
+        else
+            return NO_TAG;
     }
 
 
