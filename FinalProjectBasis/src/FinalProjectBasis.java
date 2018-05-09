@@ -19,6 +19,9 @@ public class FinalProjectBasis {
     private static final int LEFT_BUMPER = 100;
     private static final int RIGHT_BUMPER = 101;
 
+    private static final int FLAME_PRESENT_LIMIT = 800;
+    private static final int FLAME_NEAR_LIMIT = 900;
+
     // Possible floor Tags
     private static final int LINE_TAG = 0;
     private static final int CIRCLE_TAG = 1;
@@ -27,6 +30,7 @@ public class FinalProjectBasis {
     // Algorithm Parameters
     private static final int DIST_TO_SIDE_WALL = 15;
     private static final int DIST_TO_FRONT_WALL = 15;
+    private static final int DIST_TO_CANDLE = 20;
     private static final int DELTA_LIMIT = 4;
     private static final float GAIN = 0.9f;
     private static final float TURN_FACTOR = 7.5f; //8 ONCEKI DEGERLERE BAK BIZ NE YAPMISIZ!
@@ -58,6 +62,11 @@ public class FinalProjectBasis {
     private static AnalogInput lineSensor;
     private static int totalLines;
 
+    private static FlameSensor flameSensor;
+    private static IntelliBrainDigitalIO flameLED;
+
+    private static Motor fan;
+
     public static void main(String[] args) {
         //****** Construction of the hardware objects ******
         startButton = IntelliBrain.getDigitalIO(12);
@@ -74,6 +83,12 @@ public class FinalProjectBasis {
 
         lineSensor = IntelliBrain.getAnalogInput(7);
         totalLines = 0;
+
+        flameSensor = new FlameSensor(FLAME_PRESENT_LIMIT, FLAME_NEAR_LIMIT);
+
+        flameLED = IntelliBrain.getDigitalIO(13);
+
+        fan = IntelliBrain.getMotor(2);
 
         lSonar = new ParallaxPing(IntelliBrain.getDigitalIO(3));
         fSonar = new ParallaxPing(IntelliBrain.getDigitalIO(4));
@@ -94,10 +109,10 @@ public class FinalProjectBasis {
                     state = navRigthState();
                     break;
                 case CENTER:
-                    // state = centerState();
+                     state = centerState();
                     break;
                 case PUT_OUT:
-                    // state = putOutState();
+                     state = putOutState();
                     break;
             }
 
@@ -106,7 +121,12 @@ public class FinalProjectBasis {
     }
 
     private static int waitState() {
-        while (startButton.isSet());
+        while (startButton.isSet()) {
+            //lcd.print(1, "Line: " + lineSensor.sample());
+            flameSensor.scan();
+            lcd.print(0, "Value: " + flameSensor.flameVal);
+            lcd.print(1, "Direction: " + flameSensor.flameDir);
+        }
         return NAV_RIGHT;
     }
 
@@ -135,11 +155,67 @@ public class FinalProjectBasis {
             lcd.print(1, "Lines: " + totalLines);
         }
 
-
         // Conditions
-        // if(flame is detected)
-        // return CENTER
-        return NAV_RIGHT;
+         if(flameSensor.scan() > 0) {
+            flameLED.set();
+            return CENTER;
+         }
+
+         return NAV_RIGHT;
+    }
+
+    private static int centerState() {
+
+        switch (flameSensor.scan()) {
+            case 1:
+                rotate(-3);
+                break;
+            case 2:
+                rotate(-3);
+                break;
+            case 3:
+                // It is alternative way to stop in front of the candle. First way.
+                // By calculating distance with sonar sensor
+                fDist = (int) getDist(fSonar);
+                move(GO_VELO / 2, 0);
+                if (fDist < DIST_TO_CANDLE) {
+                    stop();
+                    return PUT_OUT;
+                }
+                break;
+            case 4:
+                rotate(3);
+                break;
+            case 5:
+                rotate(3);
+                break;
+            case -1:
+                // !!! Write here again !!!
+                flameLED.clear();
+                return NAV_RIGHT;
+            // It is alternative way to stop in front of the candle. Third way.
+//            case 0:
+//                stop();
+//                return NAV_RIGHT;
+        }
+
+        // It is alternative way to stop in front of the candle.
+//        if (flameSensor.flameVal > FLAME_NEAR_LIMIT) {
+//            stop();
+//            return PUT_OUT;
+//        }
+
+        lcd.print(0, "Value: " + flameSensor.flameVal);
+        lcd.print(1, "Direction: " + flameSensor.flameDir);
+        return CENTER;
+    }
+
+    private static int putOutState() {
+        fan.setPower(16);
+        wait(3000);
+        fan.setPower(0);
+        flameLED.clear();
+        return WAIT;
     }
 
     //****** Motor Functions ******
@@ -218,13 +294,4 @@ public class FinalProjectBasis {
             case PUT_OUT:   lcd.print(0, "PUT_OUT");   break;
         }
     }
-
-//    private static int centerState() {
-//
-//    }
-
-//    private static int putOutState() {
-//
-//    }
-
 }
